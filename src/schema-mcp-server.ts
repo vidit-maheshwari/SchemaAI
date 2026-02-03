@@ -120,35 +120,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     const schema = request.params.arguments?.schema as unknown;
 
     if (!projectRef) {
-      throw new Error("Missing required argument: project_ref");
-    }
-
-    assertValidIdentifier(schemaName, "schema_name");
-    const parsedSchema = parseSchema(schema);
-    assertSchemaIsSafeToExecute(parsedSchema);
-
-    const tableNames = parsedSchema.tables.map((t) => t.name);
-    const existingTables = await supabaseFindExistingTables({
-      projectRef,
-      schemaName,
-      tableNames,
-    });
-
-    // Even though we generate idempotent DDL (IF NOT EXISTS), we still block execution
-    // when any target table already exists to avoid modifying existing schemas.
-
-    const ddl = generateSQL(parsedSchema, {
-      includeHeader: false,
-      includeComments: false,
-      qualifyTables: true,
-      schemaName,
-      idempotent: true,
-      strictExpressionSafety: true,
-    });
-
-    const executableSql = `BEGIN;\n${stripSqlComments(ddl)}\nCOMMIT;`;
-
-    if (existingTables.length > 0) {
       return {
         content: [
           {
@@ -157,11 +128,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
               {
                 ok: false,
                 executed: false,
-                error: "One or more tables already exist in the target database.",
-                conflicts: existingTables,
-                project_ref: projectRef,
-                schema_name: schemaName,
-                sql_preview: executableSql,
+                error: "Missing required argument: project_ref",
               },
               null,
               2
@@ -171,21 +138,146 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       };
     }
 
-    if (!confirm) {
+    let executableSql: string | undefined;
+
+    try {
+      assertValidIdentifier(schemaName, "schema_name");
+      const parsedSchema = parseSchema(schema);
+      assertSchemaIsSafeToExecute(parsedSchema);
+
+      const tableNames = parsedSchema.tables.map((t) => t.name);
+      const existingTables = await supabaseFindExistingTables({
+        projectRef,
+        schemaName,
+        tableNames,
+      });
+
+      // Even though we generate idempotent DDL (IF NOT EXISTS), we still block execution
+      // when any target table already exists to avoid modifying existing schemas.
+
+      const ddl = generateSQL(parsedSchema, {
+        includeHeader: false,
+        includeComments: false,
+        qualifyTables: true,
+        schemaName,
+        idempotent: true,
+        strictExpressionSafety: true,
+      });
+
+      executableSql = `BEGIN;\n${stripSqlComments(ddl)}\nCOMMIT;`;
+
+      if (existingTables.length > 0) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  ok: false,
+                  executed: false,
+                  error:
+                    "One or more tables already exist in the target database.",
+                  conflicts: existingTables,
+                  project_ref: projectRef,
+                  schema_name: schemaName,
+                  sql_preview: executableSql,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      if (!confirm) {
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  ok: true,
+                  executed: false,
+                  project_ref: projectRef,
+                  schema_name: schemaName,
+                  tables_to_create: tableNames,
+                  sql_preview: executableSql,
+                  next_step:
+                    "Ask the user to confirm, then call supabase_apply_schema again with confirm=true.",
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+
+      try {
+        const result = await supabaseDatabaseQuery({
+          projectRef,
+          readOnly: false,
+          query: executableSql,
+        });
+
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  ok: true,
+                  executed: true,
+                  project_ref: projectRef,
+                  schema_name: schemaName,
+                  tables_created: tableNames,
+                  result,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        return {
+          content: [
+            {
+              type: "text",
+              text: JSON.stringify(
+                {
+                  ok: false,
+                  executed: false,
+                  project_ref: projectRef,
+                  schema_name: schemaName,
+                  error: message,
+                  stage: "execution",
+                  sql_preview: executableSql,
+                },
+                null,
+                2
+              ),
+            },
+          ],
+        };
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       return {
         content: [
           {
             type: "text",
             text: JSON.stringify(
               {
-                ok: true,
+                ok: false,
                 executed: false,
                 project_ref: projectRef,
                 schema_name: schemaName,
-                tables_to_create: tableNames,
+                error: message,
+                stage: "validation_or_generation",
                 sql_preview: executableSql,
-                next_step:
-                  "Ask the user to confirm, then call supabase_apply_schema again with confirm=true.",
               },
               null,
               2
@@ -194,32 +286,6 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         ],
       };
     }
-
-    const result = await supabaseDatabaseQuery({
-      projectRef,
-      readOnly: false,
-      query: executableSql,
-    });
-
-    return {
-      content: [
-        {
-          type: "text",
-          text: JSON.stringify(
-            {
-              ok: true,
-              executed: true,
-              project_ref: projectRef,
-              schema_name: schemaName,
-              tables_created: tableNames,
-              result,
-            },
-            null,
-            2
-          ),
-        },
-      ],
-    };
   }
 
   throw new Error(`Unknown tool: ${request.params.name}`);

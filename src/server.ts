@@ -60,15 +60,20 @@ const { close } = await startSSEServer({
   },
 });
 
-const shutdown = () => {
+const shutdown = async () => {
   try {
-    close();
+    await close();
   } finally {
     process.exit(0);
   }
 };
 
-process.once("SIGINT", shutdown);
-process.once("SIGTERM", shutdown);
+process.once("SIGINT", () => {
+  void shutdown();
+});
+
+process.once("SIGTERM", () => {
+  void shutdown();
+});
 
 console.log(`MCP Proxy Server running on port ${process.env.NEXT_PUBLIC_SERVER_PORT}`);
