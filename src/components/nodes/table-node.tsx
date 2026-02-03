@@ -61,10 +61,10 @@ export const TableNode = memo(({ data, selected }: NodeProps<TableNodeType>) => 
                 {/* Column Icons */}
                 <div className="flex gap-1">
                   {column.primaryKey && (
-                    <Key size={14} className="text-yellow-600" />
+                    <Key size={14} className="text-yellow-600" aria-label="Primary key" />
                   )}
                   {column.notNull && (
-                    <Lock size={14} className="text-red-600" />
+                    <Lock size={14} className="text-red-600" aria-label="Not null" />
                   )}
                 </div>
 

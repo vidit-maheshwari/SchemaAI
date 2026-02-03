@@ -15,6 +15,11 @@ export interface GenerateSqlOptions {
   includeComments?: boolean;
   /** Use IF NOT EXISTS where supported (CREATE TABLE / CREATE INDEX). */
   idempotent?: boolean;
+  /**
+   * When enabled, validates that `defaultValue` and `check` expressions do not contain
+   * semicolons or comment markers before embedding them into SQL.
+   */
+  strictExpressionSafety?: boolean;
 }
 
 /**
@@ -35,6 +40,7 @@ export function generateSQL(
       | "includeIndexes"
       | "includeComments"
       | "idempotent"
+      | "strictExpressionSafety"
     >
   > &
     Pick<GenerateSqlOptions, "schemaName"> = {
@@ -45,6 +51,7 @@ export function generateSQL(
     includeIndexes: options.includeIndexes ?? true,
     includeComments: options.includeComments ?? true,
     idempotent: options.idempotent ?? true,
+    strictExpressionSafety: options.strictExpressionSafety ?? false,
   };
 
   // Header comment
@@ -111,7 +118,7 @@ function generateCreateTable(
   options: Required<
     Pick<
       GenerateSqlOptions,
-      "qualifyTables" | "includeComments" | "idempotent"
+      "qualifyTables" | "includeComments" | "idempotent" | "strictExpressionSafety"
     >
   > &
     Pick<GenerateSqlOptions, "schemaName">
@@ -126,7 +133,7 @@ function generateCreateTable(
   // Generate column definitions
   const columnDefs = table.columns.map((col, index) => {
     const isLast = index === table.columns.length - 1;
-    return "  " + generateColumnDefinition(col) + (isLast ? "" : ",");
+    return "  " + generateColumnDefinition(col, options) + (isLast ? "" : ",");
   });
 
   lines.push(...columnDefs);
@@ -146,7 +153,10 @@ function generateCreateTable(
 /**
  * Generate column definition
  */
-function generateColumnDefinition(column: Column): string {
+function generateColumnDefinition(
+  column: Column,
+  options: Pick<GenerateSqlOptions, "strictExpressionSafety">
+): string {
   const parts: string[] = [quoteIdent(column.name), column.type.toUpperCase()];
 
   // Add constraints
@@ -163,12 +173,19 @@ function generateColumnDefinition(column: Column): string {
   }
 
   if (column.defaultValue !== undefined && column.defaultValue !== "") {
-    assertSafeSqlExpression(column.defaultValue, `defaultValue for ${column.name}`);
+    if (options.strictExpressionSafety) {
+      assertSafeSqlExpression(
+        column.defaultValue,
+        `defaultValue for ${column.name}`
+      );
+    }
     parts.push(`DEFAULT ${column.defaultValue}`);
   }
 
   if (column.check) {
-    assertSafeSqlExpression(column.check, `check for ${column.name}`);
+    if (options.strictExpressionSafety) {
+      assertSafeSqlExpression(column.check, `check for ${column.name}`);
+    }
     parts.push(`CHECK (${column.check})`);
   }
 

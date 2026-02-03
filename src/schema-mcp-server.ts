@@ -140,6 +140,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       qualifyTables: true,
       schemaName,
       idempotent: true,
+      strictExpressionSafety: true,
     });
 
     const executableSql = `BEGIN;\n${stripSqlComments(ddl)}\nCOMMIT;`;
