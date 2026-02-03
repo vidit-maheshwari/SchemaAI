@@ -1,6 +1,8 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+import { generateSQL } from "./lib/sql-generator";
+import type { DatabaseSchema } from "./types/schema";
 
 // Create MCP server
 const server = new Server(
@@ -34,6 +36,47 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
           required: ["description"],
         },
       },
+      {
+        name: "supabase_list_projects",
+        description:
+          "Lists Supabase projects available to the configured Supabase access token. Useful for mapping a user-provided project name to its project ref.",
+        inputSchema: {
+          type: "object",
+          properties: {},
+          additionalProperties: false,
+        },
+      },
+      {
+        name: "supabase_apply_schema",
+        description:
+          "Generates PostgreSQL DDL from a schema object and (optionally) executes it against a Supabase project's database. Safety: requires confirm=true to execute and will refuse to run if any target table already exists.",
+        inputSchema: {
+          type: "object",
+          properties: {
+            project_ref: {
+              type: "string",
+              description: "Supabase project ref (the short ID used in the dashboard URL)",
+            },
+            schema_name: {
+              type: "string",
+              description: "Postgres schema to create tables in (usually 'public')",
+              default: "public",
+            },
+            schema: {
+              type: "object",
+              description:
+                "Database schema object containing tables and relations (same structure used by schemaCanvas)",
+            },
+            confirm: {
+              type: "boolean",
+              description:
+                "Must be true to execute. If false, the tool will only return a preview and any conflicts.",
+            },
+          },
+          required: ["project_ref", "schema", "confirm"],
+          additionalProperties: false,
+        },
+      },
     ],
   };
 });
@@ -56,15 +99,347 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     };
   }
 
+  if (request.params.name === "supabase_list_projects") {
+    const projects = await supabaseListProjects();
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(projects, null, 2),
+        },
+      ],
+    };
+  }
+
+  if (request.params.name === "supabase_apply_schema") {
+    const projectRef = String(request.params.arguments?.project_ref || "").trim();
+    const schemaName = String(
+      request.params.arguments?.schema_name || "public"
+    ).trim();
+    const confirm = Boolean(request.params.arguments?.confirm);
+    const schema = request.params.arguments?.schema as unknown;
+
+    if (!projectRef) {
+      throw new Error("Missing required argument: project_ref");
+    }
+
+    assertValidIdentifier(schemaName, "schema_name");
+    const parsedSchema = parseSchema(schema);
+    assertSchemaIsSafeToExecute(parsedSchema);
+
+    const tableNames = parsedSchema.tables.map((t) => t.name);
+    const existingTables = await supabaseFindExistingTables({
+      projectRef,
+      schemaName,
+      tableNames,
+    });
+
+    const ddl = generateSQL(parsedSchema, {
+      includeHeader: false,
+      includeComments: false,
+      qualifyTables: true,
+      schemaName,
+      idempotent: true,
+    });
+
+    const executableSql = `BEGIN;\n${stripSqlComments(ddl)}\nCOMMIT;`;
+
+    if (existingTables.length > 0) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                ok: false,
+                executed: false,
+                error: "One or more tables already exist in the target database.",
+                conflicts: existingTables,
+                project_ref: projectRef,
+                schema_name: schemaName,
+                sql_preview: executableSql,
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
+    if (!confirm) {
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(
+              {
+                ok: true,
+                executed: false,
+                project_ref: projectRef,
+                schema_name: schemaName,
+                tables_to_create: tableNames,
+                sql_preview: executableSql,
+                next_step:
+                  "Ask the user to confirm, then call supabase_apply_schema again with confirm=true.",
+              },
+              null,
+              2
+            ),
+          },
+        ],
+      };
+    }
+
+    const result = await supabaseDatabaseQuery({
+      projectRef,
+      readOnly: false,
+      query: executableSql,
+    });
+
+    return {
+      content: [
+        {
+          type: "text",
+          text: JSON.stringify(
+            {
+              ok: true,
+              executed: true,
+              project_ref: projectRef,
+              schema_name: schemaName,
+              tables_created: tableNames,
+              result,
+            },
+            null,
+            2
+          ),
+        },
+      ],
+    };
+  }
+
   throw new Error(`Unknown tool: ${request.params.name}`);
 });
 
-function generateSchemaFromDescription(description: string): any {
+type SupabaseProjectListItem = {
+  name: string;
+  id: string;
+  region: string;
+  status: string;
+  databaseHost: string;
+  createdAt: string;
+};
+
+async function supabaseListProjects(): Promise<SupabaseProjectListItem[]> {
+  const projects = (await supabaseRequest("/v1/projects")) as unknown[];
+
+  return projects
+    .map((project) => {
+      const p = project as Record<string, unknown>;
+      const ref = typeof p.ref === "string" ? p.ref : undefined;
+      const name = typeof p.name === "string" ? p.name : undefined;
+      const region = typeof p.region === "string" ? p.region : "";
+      const status = typeof p.status === "string" ? p.status : "";
+      const createdAt = typeof p.created_at === "string" ? p.created_at : "";
+
+      if (!ref || !name) return null;
+
+      return {
+        name,
+        id: ref,
+        region,
+        status,
+        databaseHost: `db.${ref}.supabase.co`,
+        createdAt,
+      };
+    })
+    .filter((p): p is SupabaseProjectListItem => Boolean(p));
+}
+
+async function supabaseFindExistingTables(args: {
+  projectRef: string;
+  schemaName: string;
+  tableNames: string[];
+}): Promise<string[]> {
+  if (args.tableNames.length === 0) return [];
+
+  for (const name of args.tableNames) {
+    assertValidIdentifier(name, "table name");
+  }
+
+  const inList = args.tableNames
+    .map((t) => `'${escapeSqlStringLiteral(t)}'`)
+    .join(", ");
+
+  const query = [
+    "SELECT table_name",
+    "FROM information_schema.tables",
+    `WHERE table_schema = '${escapeSqlStringLiteral(args.schemaName)}'`,
+    `AND table_name IN (${inList});`,
+  ].join("\n");
+
+  const response = await supabaseDatabaseQuery({
+    projectRef: args.projectRef,
+    readOnly: true,
+    query,
+  });
+
+  const rows = getSupabaseQueryRows(response);
+  if (!Array.isArray(rows)) return [];
+
+  return rows
+    .map((row) => {
+      if (!row || typeof row !== "object") return null;
+      const r = row as Record<string, unknown>;
+      return typeof r.table_name === "string" ? r.table_name : null;
+    })
+    .filter((v): v is string => Boolean(v));
+}
+
+function getSupabaseQueryRows(response: unknown): unknown[] | null {
+  if (Array.isArray(response)) return response;
+  if (!response || typeof response !== "object") return null;
+
+  const r = response as Record<string, unknown>;
+  const data = r.data;
+  if (Array.isArray(data)) return data;
+
+  const result = r.result;
+  if (Array.isArray(result)) return result;
+
+  return null;
+}
+
+async function supabaseDatabaseQuery(args: {
+  projectRef: string;
+  readOnly: boolean;
+  query: string;
+}): Promise<unknown> {
+  const endpoint = args.readOnly
+    ? `/v1/projects/${args.projectRef}/database/query/read-only`
+    : `/v1/projects/${args.projectRef}/database/query`;
+
+  return supabaseRequest(endpoint, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ query: args.query }),
+  });
+}
+
+async function supabaseRequest(
+  path: string,
+  init: RequestInit = {}
+): Promise<unknown> {
+  const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
+  if (!accessToken) {
+    throw new Error("SUPABASE_ACCESS_TOKEN is not set in the server environment");
+  }
+
+  const res = await fetch(`https://api.supabase.com${path}`, {
+    ...init,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      ...(init.headers || {}),
+    },
+  });
+
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new Error(
+      `Supabase API request failed (${res.status} ${res.statusText}): ${body || "(empty response)"}`
+    );
+  }
+
+  const contentType = res.headers.get("content-type") || "";
+  if (!contentType.includes("application/json")) {
+    return res.text();
+  }
+
+  return res.json();
+}
+
+function parseSchema(schema: unknown): DatabaseSchema {
+  if (!schema || typeof schema !== "object") {
+    throw new Error("schema must be an object");
+  }
+
+  const s = schema as Partial<DatabaseSchema>;
+  if (!s.name || typeof s.name !== "string") {
+    throw new Error("schema.name must be a string");
+  }
+  if (!Array.isArray(s.tables)) {
+    throw new Error("schema.tables must be an array");
+  }
+  if (!Array.isArray(s.relations)) {
+    throw new Error("schema.relations must be an array");
+  }
+
+  return s as DatabaseSchema;
+}
+
+function assertSchemaIsSafeToExecute(schema: DatabaseSchema): void {
+  const tableNameSet = new Set<string>();
+
+  for (const table of schema.tables) {
+    assertValidIdentifier(table.name, "table name");
+    if (tableNameSet.has(table.name)) {
+      throw new Error(`Duplicate table name: ${table.name}`);
+    }
+    tableNameSet.add(table.name);
+
+    const columnNameSet = new Set<string>();
+    for (const column of table.columns) {
+      assertValidIdentifier(column.name, "column name");
+      if (columnNameSet.has(column.name)) {
+        throw new Error(
+          `Duplicate column name '${column.name}' in table '${table.name}'`
+        );
+      }
+      columnNameSet.add(column.name);
+
+      if (column.defaultValue) {
+        assertSafeSqlFragment(column.defaultValue, "defaultValue");
+      }
+      if (column.check) {
+        assertSafeSqlFragment(column.check, "check");
+      }
+    }
+  }
+}
+
+function assertValidIdentifier(value: string, label: string): void {
+  if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(value)) {
+    throw new Error(`${label} must be a valid SQL identifier: '${value}'`);
+  }
+}
+
+function assertSafeSqlFragment(value: string, label: string): void {
+  if (/[;]|--|\/\*/.test(value)) {
+    throw new Error(
+      `${label} contains disallowed characters (semicolons or SQL comments): '${value}'`
+    );
+  }
+}
+
+function stripSqlComments(sql: string): string {
+  return sql
+    .split("\n")
+    .filter((line) => !line.trimStart().startsWith("--"))
+    .join("\n")
+    .trim();
+}
+
+function escapeSqlStringLiteral(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+function generateSchemaFromDescription(description: string): DatabaseSchema {
   const lowerDesc = description.toLowerCase();
 
   // Simple keyword-based schema generation
-  const tables: any[] = [];
-  let tableId = 0;
+  const tables: DatabaseSchema["tables"] = [];
   let colId = 0;
 
   // Common patterns
@@ -163,12 +538,12 @@ function generateSchemaFromDescription(description: string): any {
   }
 
   // Generate relations
-  const relations: any[] = [];
+  const relations: DatabaseSchema["relations"] = [];
   let relId = 0;
 
   // Auto-detect foreign keys and create relations
-  tables.forEach((table, i) => {
-    table.columns.forEach((col: any) => {
+  tables.forEach((table) => {
+    table.columns.forEach((col) => {
       if (col.name.endsWith("_id")) {
         const refTableName = col.name.replace("_id", "") + "s";
         const refTable = tables.find((t) => t.name === refTableName);

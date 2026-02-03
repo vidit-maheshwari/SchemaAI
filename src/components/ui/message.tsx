@@ -102,7 +102,7 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(
       variant,
       message,
       isLoading,
-      isFinalMessage,
+      isFinalMessage: _isFinalMessage,
       ...props
     },
     ref
@@ -119,6 +119,7 @@ const Message = React.forwardRef<HTMLDivElement, MessageProps>(
     return (
       <div
         ref={ref}
+        data-final-message={_isFinalMessage ? "true" : undefined}
         className={cn(messageVariants({ variant, align: role }), className)}
         {...props}
       >

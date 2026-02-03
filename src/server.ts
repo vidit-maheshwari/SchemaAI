@@ -32,7 +32,7 @@ try {
   throw error;
 }
 
-const { close } = await startSSEServer({
+await startSSEServer({
   port: parseInt(process.env.NEXT_PUBLIC_SERVER_PORT!),
   endpoint: "/sse",
   createServer: async () => {

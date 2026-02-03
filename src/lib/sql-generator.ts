@@ -1,18 +1,61 @@
 import type { DatabaseSchema, Table, Column, Relation } from "@/types/schema";
 
+export interface GenerateSqlOptions {
+  /** Postgres schema name (e.g. "public"). Only used when `qualifyTables` is true. */
+  schemaName?: string;
+  /** Whether to prefix tables with the schema name (e.g. public.users). */
+  qualifyTables?: boolean;
+  /** Include the header comment with schema name and generation timestamp. */
+  includeHeader?: boolean;
+  /** Include foreign key constraints (generated as ALTER TABLE statements). */
+  includeForeignKeys?: boolean;
+  /** Include indexes (primarily for foreign key columns). */
+  includeIndexes?: boolean;
+  /** Include COMMENT ON statements for tables. */
+  includeComments?: boolean;
+  /** Use IF NOT EXISTS where supported (CREATE TABLE / CREATE INDEX). */
+  idempotent?: boolean;
+}
+
 /**
  * Generate PostgreSQL DDL from a database schema
  */
-export function generateSQL(schema: DatabaseSchema): string {
+export function generateSQL(
+  schema: DatabaseSchema,
+  options: GenerateSqlOptions = {}
+): string {
   const sections: string[] = [];
 
+  const resolvedOptions: Required<
+    Pick<
+      GenerateSqlOptions,
+      | "qualifyTables"
+      | "includeHeader"
+      | "includeForeignKeys"
+      | "includeIndexes"
+      | "includeComments"
+      | "idempotent"
+    >
+  > &
+    Pick<GenerateSqlOptions, "schemaName"> = {
+    schemaName: options.schemaName,
+    qualifyTables: options.qualifyTables ?? false,
+    includeHeader: options.includeHeader ?? true,
+    includeForeignKeys: options.includeForeignKeys ?? true,
+    includeIndexes: options.includeIndexes ?? true,
+    includeComments: options.includeComments ?? true,
+    idempotent: options.idempotent ?? true,
+  };
+
   // Header comment
-  sections.push(`-- Generated Schema: ${schema.name}`);
-  if (schema.description) {
-    sections.push(`-- ${schema.description}`);
+  if (resolvedOptions.includeHeader) {
+    sections.push(`-- Generated Schema: ${schema.name}`);
+    if (schema.description) {
+      sections.push(`-- ${schema.description}`);
+    }
+    sections.push(`-- Generated at: ${new Date().toISOString()}`);
+    sections.push("");
   }
-  sections.push(`-- Generated at: ${new Date().toISOString()}`);
-  sections.push("");
 
   // Generate CREATE TABLE statements
   sections.push("-- ================================================");
@@ -21,19 +64,19 @@ export function generateSQL(schema: DatabaseSchema): string {
   sections.push("");
 
   for (const table of schema.tables) {
-    sections.push(generateCreateTable(table));
+    sections.push(generateCreateTable(table, resolvedOptions));
     sections.push("");
   }
 
   // Generate foreign key constraints
-  if (schema.relations.length > 0) {
+  if (resolvedOptions.includeForeignKeys && schema.relations.length > 0) {
     sections.push("-- ================================================");
     sections.push("-- FOREIGN KEY CONSTRAINTS");
     sections.push("-- ================================================");
     sections.push("");
 
     for (const relation of schema.relations) {
-      const fkSql = generateForeignKey(relation, schema);
+      const fkSql = generateForeignKey(relation, schema, resolvedOptions);
       if (fkSql) {
         sections.push(fkSql);
         sections.push("");
@@ -42,16 +85,18 @@ export function generateSQL(schema: DatabaseSchema): string {
   }
 
   // Generate indexes for foreign keys
-  sections.push("-- ================================================");
-  sections.push("-- INDEXES");
-  sections.push("-- ================================================");
-  sections.push("");
+  if (resolvedOptions.includeIndexes) {
+    sections.push("-- ================================================");
+    sections.push("-- INDEXES");
+    sections.push("-- ================================================");
+    sections.push("");
 
-  for (const relation of schema.relations) {
-    const indexSql = generateIndexForForeignKey(relation);
-    if (indexSql) {
-      sections.push(indexSql);
-      sections.push("");
+    for (const relation of schema.relations) {
+      const indexSql = generateIndexForForeignKey(relation, schema, resolvedOptions);
+      if (indexSql) {
+        sections.push(indexSql);
+        sections.push("");
+      }
     }
   }
 
@@ -61,10 +106,22 @@ export function generateSQL(schema: DatabaseSchema): string {
 /**
  * Generate CREATE TABLE statement for a single table
  */
-function generateCreateTable(table: Table): string {
+function generateCreateTable(
+  table: Table,
+  options: Required<
+    Pick<
+      GenerateSqlOptions,
+      "qualifyTables" | "includeComments" | "idempotent"
+    >
+  > &
+    Pick<GenerateSqlOptions, "schemaName">
+): string {
   const lines: string[] = [];
 
-  lines.push(`CREATE TABLE ${table.name} (`);
+  const tableRef = getTableRef(table.name, options);
+  lines.push(
+    `CREATE TABLE ${options.idempotent ? "IF NOT EXISTS " : ""}${tableRef} (`
+  );
 
   // Generate column definitions
   const columnDefs = table.columns.map((col, index) => {
@@ -76,9 +133,11 @@ function generateCreateTable(table: Table): string {
   lines.push(");");
 
   // Add table comment if description exists
-  if (table.description) {
+  if (options.includeComments && table.description) {
     lines.push("");
-    lines.push(`COMMENT ON TABLE ${table.name} IS '${escapeString(table.description)}';`);
+    lines.push(
+      `COMMENT ON TABLE ${tableRef} IS '${escapeString(table.description)}';`
+    );
   }
 
   return lines.join("\n");
@@ -88,7 +147,7 @@ function generateCreateTable(table: Table): string {
  * Generate column definition
  */
 function generateColumnDefinition(column: Column): string {
-  const parts: string[] = [column.name, column.type.toUpperCase()];
+  const parts: string[] = [quoteIdent(column.name), column.type.toUpperCase()];
 
   // Add constraints
   if (column.primaryKey) {
@@ -117,7 +176,12 @@ function generateColumnDefinition(column: Column): string {
 /**
  * Generate foreign key constraint
  */
-function generateForeignKey(relation: Relation, schema: DatabaseSchema): string | null {
+function generateForeignKey(
+  relation: Relation,
+  schema: DatabaseSchema,
+  options: Required<Pick<GenerateSqlOptions, "qualifyTables">> &
+    Pick<GenerateSqlOptions, "schemaName">
+): string | null {
   const fromTable = schema.tables.find((t) => t.id === relation.from.tableId);
   const toTable = schema.tables.find((t) => t.id === relation.to.tableId);
 
@@ -133,10 +197,10 @@ function generateForeignKey(relation: Relation, schema: DatabaseSchema): string 
   const constraintName = relation.name || `fk_${fromTable.name}_${toTable.name}`;
 
   const parts: string[] = [
-    `ALTER TABLE ${fromTable.name}`,
-    `ADD CONSTRAINT ${constraintName}`,
-    `FOREIGN KEY (${fromColName})`,
-    `REFERENCES ${toTable.name}(${toColName})`,
+    `ALTER TABLE ${getTableRef(fromTable.name, options)}`,
+    `ADD CONSTRAINT ${quoteIdent(constraintName)}`,
+    `FOREIGN KEY (${quoteIdent(fromColName)})`,
+    `REFERENCES ${getTableRef(toTable.name, options)}(${quoteIdent(toColName)})`,
   ];
 
   if (relation.onDelete) {
@@ -153,11 +217,23 @@ function generateForeignKey(relation: Relation, schema: DatabaseSchema): string 
 /**
  * Generate index for foreign key
  */
-function generateIndexForForeignKey(relation: Relation): string | null {
-  // Index name format: idx_tablename_columnname
-  const indexName = `idx_${relation.from.tableId}_${relation.from.columnId}`;
+function generateIndexForForeignKey(
+  relation: Relation,
+  schema: DatabaseSchema,
+  options: Required<
+    Pick<GenerateSqlOptions, "qualifyTables" | "idempotent">
+  > &
+    Pick<GenerateSqlOptions, "schemaName">
+): string | null {
+  const fromTable = schema.tables.find((t) => t.id === relation.from.tableId);
+  if (!fromTable) return null;
 
-  return `CREATE INDEX ${indexName} ON ${relation.from.tableId}(${relation.from.columnId});`;
+  const fromColumn = fromTable.columns.find((c) => c.id === relation.from.columnId);
+  if (!fromColumn) return null;
+
+  const indexName = `idx_${fromTable.name}_${fromColumn.name}`;
+
+  return `CREATE INDEX ${options.idempotent ? "IF NOT EXISTS " : ""}${quoteIdent(indexName)} ON ${getTableRef(fromTable.name, options)}(${quoteIdent(fromColumn.name)});`;
 }
 
 /**
@@ -165,6 +241,22 @@ function generateIndexForForeignKey(relation: Relation): string | null {
  */
 function escapeString(str: string): string {
   return str.replace(/'/g, "''");
+}
+
+function quoteIdent(ident: string): string {
+  return `"${ident.replace(/"/g, '""')}"`;
+}
+
+function getTableRef(
+  tableName: string,
+  options: Pick<GenerateSqlOptions, "qualifyTables" | "schemaName">
+): string {
+  if (options.qualifyTables) {
+    const schemaName = options.schemaName || "public";
+    return `${quoteIdent(schemaName)}.${quoteIdent(tableName)}`;
+  }
+
+  return quoteIdent(tableName);
 }
 
 /**
