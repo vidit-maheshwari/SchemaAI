@@ -134,6 +134,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       tableNames,
     });
 
+    // Even though we generate idempotent DDL (IF NOT EXISTS), we still block execution
+    // when any target table already exists to avoid modifying existing schemas.
+
     const ddl = generateSQL(parsedSchema, {
       includeHeader: false,
       includeComments: false,
@@ -344,13 +347,28 @@ async function supabaseRequest(
     throw new Error("SUPABASE_ACCESS_TOKEN is not set in the server environment");
   }
 
-  const res = await fetch(`https://api.supabase.com${path}`, {
-    ...init,
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      ...(init.headers || {}),
-    },
-  });
+  const timeoutMs = 15_000;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  let res: Response;
+  try {
+    res = await fetch(`https://api.supabase.com${path}`, {
+      ...init,
+      signal: controller.signal,
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        ...(init.headers || {}),
+      },
+    });
+  } catch (err) {
+    if (err instanceof Error && err.name === "AbortError") {
+      throw new Error(`Supabase API request timed out after ${timeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -381,6 +399,34 @@ function parseSchema(schema: unknown): DatabaseSchema {
   }
   if (!Array.isArray(s.relations)) {
     throw new Error("schema.relations must be an array");
+  }
+
+  for (const table of s.tables as unknown[]) {
+    if (!table || typeof table !== "object") {
+      throw new Error("schema.tables entries must be objects");
+    }
+    const t = table as Record<string, unknown>;
+    if (typeof t.id !== "string" || typeof t.name !== "string") {
+      throw new Error("schema.tables entries must include string id and name");
+    }
+    if (!Array.isArray(t.columns)) {
+      throw new Error("schema.tables entries must include a columns array");
+    }
+  }
+
+  for (const relation of s.relations as unknown[]) {
+    if (!relation || typeof relation !== "object") {
+      throw new Error("schema.relations entries must be objects");
+    }
+    const r = relation as Record<string, unknown>;
+    if (typeof r.id !== "string" || typeof r.type !== "string") {
+      throw new Error("schema.relations entries must include string id and type");
+    }
+    const from = r.from;
+    const to = r.to;
+    if (!from || typeof from !== "object" || !to || typeof to !== "object") {
+      throw new Error("schema.relations entries must include from/to objects");
+    }
   }
 
   return s as DatabaseSchema;

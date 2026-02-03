@@ -32,7 +32,7 @@ try {
   throw error;
 }
 
-await startSSEServer({
+const { close } = await startSSEServer({
   port: parseInt(process.env.NEXT_PUBLIC_SERVER_PORT!),
   endpoint: "/sse",
   createServer: async () => {
@@ -59,5 +59,16 @@ await startSSEServer({
     return server;
   },
 });
+
+const shutdown = () => {
+  try {
+    close();
+  } finally {
+    process.exit(0);
+  }
+};
+
+process.once("SIGINT", shutdown);
+process.once("SIGTERM", shutdown);
 
 console.log(`MCP Proxy Server running on port ${process.env.NEXT_PUBLIC_SERVER_PORT}`);
