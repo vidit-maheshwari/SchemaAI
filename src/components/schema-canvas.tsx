@@ -16,9 +16,9 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { TableNode } from "./nodes/table-node";
+import { TableNode, type TableNodeData } from "./nodes/table-node";
 import { useSchemaStore } from "@/lib/store/schema-store";
-import type { DatabaseSchema, Table } from "@/types/schema";
+import type { DatabaseSchema } from "@/types/schema";
 
 const nodeTypes = {
   table: TableNode,
@@ -35,7 +35,6 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
   const addRelation = useSchemaStore((state) => state.addRelation);
   const updateTable = useSchemaStore((state) => state.updateTable);
 
-  type TableNodeData = Record<string, unknown> & { table: Table };
   type TableFlowNode = Node<TableNodeData, "table">;
   type TableFlowEdge = Edge;
 

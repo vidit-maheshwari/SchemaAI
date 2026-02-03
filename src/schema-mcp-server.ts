@@ -478,6 +478,22 @@ function parseSchema(schema: unknown): DatabaseSchema {
     if (!Array.isArray(t.columns)) {
       throw new Error("schema.tables entries must include a columns array");
     }
+
+    for (const column of t.columns as unknown[]) {
+      if (!column || typeof column !== "object") {
+        throw new Error("schema.tables[*].columns entries must be objects");
+      }
+      const c = column as Record<string, unknown>;
+      if (
+        typeof c.id !== "string" ||
+        typeof c.name !== "string" ||
+        typeof c.type !== "string"
+      ) {
+        throw new Error(
+          "schema.tables[*].columns entries must include string id, name, and type"
+        );
+      }
+    }
   }
 
   for (const relation of s.relations as unknown[]) {
@@ -492,6 +508,19 @@ function parseSchema(schema: unknown): DatabaseSchema {
     const to = r.to;
     if (!from || typeof from !== "object" || !to || typeof to !== "object") {
       throw new Error("schema.relations entries must include from/to objects");
+    }
+
+    const fromObj = from as Record<string, unknown>;
+    const toObj = to as Record<string, unknown>;
+    if (
+      typeof fromObj.tableId !== "string" ||
+      typeof fromObj.columnId !== "string" ||
+      typeof toObj.tableId !== "string" ||
+      typeof toObj.columnId !== "string"
+    ) {
+      throw new Error(
+        "schema.relations entries must include string from/to tableId and columnId"
+      );
     }
   }
 

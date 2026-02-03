@@ -4,7 +4,7 @@ import type { Table } from "@/types/schema";
 import { useSchemaStore } from "@/lib/store/schema-store";
 import { Trash2, Key, Lock } from "lucide-react";
 
-interface TableNodeData extends Record<string, unknown> {
+export interface TableNodeData extends Record<string, unknown> {
   table: Table;
 }
 
