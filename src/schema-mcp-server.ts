@@ -332,6 +332,12 @@ async function supabaseRequest(
   path: string,
   init: RequestInit = {}
 ): Promise<unknown> {
+  if (typeof fetch !== "function") {
+    throw new Error(
+      "Global fetch is not available in this runtime. Use Node.js 18+ or provide a fetch polyfill."
+    );
+  }
+
   const accessToken = process.env.SUPABASE_ACCESS_TOKEN;
   if (!accessToken) {
     throw new Error("SUPABASE_ACCESS_TOKEN is not set in the server environment");

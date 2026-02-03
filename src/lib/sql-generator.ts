@@ -163,10 +163,12 @@ function generateColumnDefinition(column: Column): string {
   }
 
   if (column.defaultValue !== undefined && column.defaultValue !== "") {
+    assertSafeSqlExpression(column.defaultValue, `defaultValue for ${column.name}`);
     parts.push(`DEFAULT ${column.defaultValue}`);
   }
 
   if (column.check) {
+    assertSafeSqlExpression(column.check, `check for ${column.name}`);
     parts.push(`CHECK (${column.check})`);
   }
 
@@ -241,6 +243,14 @@ function generateIndexForForeignKey(
  */
 function escapeString(str: string): string {
   return str.replace(/'/g, "''");
+}
+
+function assertSafeSqlExpression(expr: string, label: string): void {
+  if (/[;]|--|\/\*/.test(expr)) {
+    throw new Error(
+      `${label} contains disallowed characters (semicolons or SQL comments)`
+    );
+  }
 }
 
 function quoteIdent(ident: string): string {
