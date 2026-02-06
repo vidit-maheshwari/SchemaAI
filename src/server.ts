@@ -11,31 +11,50 @@ dotenv.config({ path: ".env.local" });
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// Proxy server for schema generator MCP
-const mcpClient = new Client({ name: "schema-generator", version: "1.0.0" });
-
 // Use tsx to run the MCP server
 const mcpServerPath = join(__dirname, "schema-mcp-server.ts");
 console.log("Starting Schema Generator MCP Server:", mcpServerPath);
 
-const stdioTransport = new StdioClientTransport({
-  command: "npx",
-  args: ["tsx", mcpServerPath],
-});
-
-console.log("Connecting to Schema Generator MCP Server...");
-try {
-  await mcpClient.connect(stdioTransport);
-  console.log("Connected successfully!");
-} catch (error) {
-  console.error("Failed to connect to MCP server:", error);
-  throw error;
+function getProcessEnv(): Record<string, string> {
+  const env: Record<string, string> = {};
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === "string") {
+      env[key] = value;
+    }
+  }
+  return env;
 }
 
 const { close } = await startSSEServer({
   port: parseInt(process.env.NEXT_PUBLIC_SERVER_PORT!),
   endpoint: "/sse",
-  createServer: async () => {
+  createServer: async (req) => {
+    const url = new URL(req.url || "/", "http://localhost");
+    const accessToken =
+      url.searchParams.get("supabase_access_token") ||
+      url.searchParams.get("supabaseAccessToken") ||
+      "";
+
+    if (!accessToken) {
+      throw new Response("Missing Supabase access token", {
+        status: 401,
+        statusText: "Unauthorized",
+      });
+    }
+
+    const mcpClient = new Client({ name: "schema-generator", version: "1.0.0" });
+
+    const stdioTransport = new StdioClientTransport({
+      command: "npx",
+      args: ["tsx", mcpServerPath],
+      env: {
+        ...getProcessEnv(),
+        SUPABASE_ACCESS_TOKEN: accessToken,
+      },
+    });
+
+    await mcpClient.connect(stdioTransport);
+
     const server = new Server(
       {
         name: "schema-generator",
@@ -48,6 +67,7 @@ const { close } = await startSSEServer({
         >,
       }
     );
+
     proxyServer({
       server,
       client: mcpClient,
@@ -56,7 +76,13 @@ const { close } = await startSSEServer({
         unknown
       >,
     });
-    return server;
+
+    return {
+      connect: server.connect.bind(server),
+      close: async () => {
+        await Promise.allSettled([server.close(), mcpClient.close()]);
+      },
+    };
   },
 });
 

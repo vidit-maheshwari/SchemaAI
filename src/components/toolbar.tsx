@@ -1,16 +1,20 @@
 "use client";
 
 import React, { useState } from "react";
-import { Plus, Download, Copy, Trash2, FileCode } from "lucide-react";
+import { Plus, Download, Copy, Trash2, FileCode, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useSchemaStore } from "@/lib/store/schema-store";
 import { downloadSQL, copySQL } from "@/lib/sql-generator";
 import { NEUBRUTALISM_COLORS } from "@/types/schema";
+import { useAuth } from "@/lib/supabase/auth-provider";
 
 interface ToolbarProps {
   onShowSQL?: () => void;
 }
 
 export function Toolbar({ onShowSQL }: ToolbarProps) {
+  const router = useRouter();
+  const { signOut } = useAuth();
   const { addTable, resetSchema, schema } = useSchemaStore();
   const [copied, setCopied] = useState(false);
 
@@ -54,6 +58,12 @@ export function Toolbar({ onShowSQL }: ToolbarProps) {
     if (confirm("Are you sure you want to clear the entire schema? This cannot be undone.")) {
       resetSchema();
     }
+  };
+
+  const handleLogout = () => {
+    void signOut().finally(() => {
+      router.replace("/login");
+    });
   };
 
   return (
@@ -110,6 +120,16 @@ export function Toolbar({ onShowSQL }: ToolbarProps) {
           {schema.tables.length} tables, {schema.relations.length} relations
         </div>
       </div>
+
+      {/* Logout Button */}
+      <button
+        onClick={handleLogout}
+        className="nb-btn bg-orange-200 hover:bg-orange-300 gap-2"
+        title="Log out"
+      >
+        <LogOut size={18} />
+        <span>Log out</span>
+      </button>
 
       {/* Divider */}
       <div className="w-0.5 h-8 bg-gray-300 mx-1"></div>

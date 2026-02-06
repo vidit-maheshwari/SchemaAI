@@ -115,13 +115,14 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
               placeholder="Enter your email"
               className="flex-1 px-6 py-4 border-4 border-black text-lg font-body focus:outline-none focus:ring-4 focus:ring-purple-400 transition-all hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
             />
-            <Link
-              href="/dashboard"
+            <button
+              onClick={handleGetStarted}
               className="nb-btn bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 hover:from-purple-500 hover:via-pink-500 hover:to-orange-500 px-8 py-4 text-lg font-heading uppercase whitespace-nowrap text-center transition-all hover:scale-105 hover:rotate-1 flex items-center justify-center gap-2"
+              type="button"
             >
               Get Started
               <ArrowRight size={20} />
-            </Link>
+            </button>
           </div>
 
           {/* Product Preview */}
@@ -234,7 +235,10 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
             </div>
             <h3 className="text-2xl font-display mb-3">Describe Your Schema</h3>
             <p className="text-gray-800 font-body font-medium text-lg leading-relaxed">
-              Tell the AI what you want to build: <span className="font-bold text-pink-600">"Create a blog with users and posts"</span>
+              Tell the AI what you want to build:{" "}
+              <span className="font-bold text-pink-600">
+                &quot;Create a blog with users and posts&quot;
+              </span>
             </p>
           </div>
 
