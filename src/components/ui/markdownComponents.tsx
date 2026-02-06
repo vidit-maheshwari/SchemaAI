@@ -41,7 +41,7 @@ export const createMarkdownComponents = (theme = "light"): Components => ({
 
     if (match && looksLikeCode(content)) {
       return (
-        <div className="relative border border-input rounded-md bg-muted">
+        <div className="relative border border-input rounded-md bg-muted overflow-x-auto max-w-full">
           <div className="absolute -top-3 left-4 px-2 py-0.5 text-xs font-semibold bg-background border border-input rounded-md">
             {match[1]}
           </div>

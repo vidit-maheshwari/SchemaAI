@@ -1,14 +1,16 @@
 import React, { memo } from "react";
-import { Handle, Position, NodeProps } from "@xyflow/react";
+import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import type { Table } from "@/types/schema";
 import { useSchemaStore } from "@/lib/store/schema-store";
 import { Trash2, Key, Lock } from "lucide-react";
 
-interface TableNodeData {
+export interface TableNodeData extends Record<string, unknown> {
   table: Table;
 }
 
-export const TableNode = memo(({ data, selected }: NodeProps<TableNodeData>) => {
+type TableNodeType = Node<TableNodeData, "table">;
+
+export const TableNode = memo(({ data, selected }: NodeProps<TableNodeType>) => {
   const { table } = data;
   const { deleteTable, setSelectedTable } = useSchemaStore();
 
@@ -59,10 +61,10 @@ export const TableNode = memo(({ data, selected }: NodeProps<TableNodeData>) => 
                 {/* Column Icons */}
                 <div className="flex gap-1">
                   {column.primaryKey && (
-                    <Key size={14} className="text-yellow-600" title="Primary Key" />
+                    <Key size={14} className="text-yellow-600" aria-label="Primary key" />
                   )}
                   {column.notNull && (
-                    <Lock size={14} className="text-red-600" title="Not Null" />
+                    <Lock size={14} className="text-red-600" aria-label="Not null" />
                   )}
                 </div>
 

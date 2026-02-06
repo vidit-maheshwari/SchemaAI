@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo } from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   ReactFlow,
   Background,
@@ -16,7 +16,7 @@ import {
   MarkerType,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { TableNode } from "./nodes/table-node";
+import { TableNode, type TableNodeData } from "./nodes/table-node";
 import { useSchemaStore } from "@/lib/store/schema-store";
 import type { DatabaseSchema } from "@/types/schema";
 
@@ -35,8 +35,11 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
   const addRelation = useSchemaStore((state) => state.addRelation);
   const updateTable = useSchemaStore((state) => state.updateTable);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  type TableFlowNode = Node<TableNodeData, "table">;
+  type TableFlowEdge = Edge;
+
+  const [nodes, setNodes, onNodesChange] = useNodesState<TableFlowNode>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<TableFlowEdge>([]);
 
   // Use provided schema or store schema, with fallback
   const activeSchema = schemaProp || storeSchema || {
@@ -64,7 +67,7 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
   useEffect(() => {
     if (!activeSchema?.tables) return;
 
-    const flowNodes: Node[] = activeSchema.tables
+    const flowNodes: TableFlowNode[] = activeSchema.tables
       .filter((table) => table?.id)
       .map((table, index) => {
         // Ensure position has valid numbers
@@ -144,7 +147,6 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
           {
             ...connection,
             animated: true,
-            style: { stroke: "#000000", strokeWidth: 3 },
           },
           eds
         )
@@ -163,7 +165,7 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
 
 
   const minimapNodeColor = useCallback((node: Node) => {
-    const table = node.data?.table;
+    const table = (node.data as TableNodeData | undefined)?.table;
     return table?.color || "#FFD700";
   }, []);
 
@@ -183,7 +185,7 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
               Start Designing Your Schema
             </h3>
             <p className="text-gray-700 mb-8 font-mono text-sm leading-relaxed max-w-lg mx-auto">
-              Use the AI assistant on the left to generate a schema by describing your database needs, or click <span className="font-bold text-black">"Add Table"</span> above to create tables manually.
+              Use the AI assistant on the left to generate a schema by describing your database needs, or click <span className="font-bold text-black">&quot;Add Table&quot;</span> above to create tables manually.
             </p>
             <div className="grid grid-cols-2 gap-4">
               <div className="nb-card p-5 bg-cyan-100 text-left">
@@ -191,7 +193,7 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
                   🤖 AI Generation
                 </div>
                 <div className="text-xs font-mono text-gray-800 leading-relaxed">
-                  "Create a blog schema with users and posts"
+                  &quot;Create a blog schema with users and posts&quot;
                 </div>
               </div>
               <div className="nb-card p-5 bg-lime-100 text-left">
@@ -199,7 +201,7 @@ export function SchemaCanvas({ schema: schemaProp }: SchemaCanvasProps) {
                   ✏️ Manual Design
                 </div>
                 <div className="text-xs font-mono text-gray-800 leading-relaxed">
-                  Click "Add Table" and customize columns
+                  Click &quot;Add Table&quot; and customize columns
                 </div>
               </div>
             </div>

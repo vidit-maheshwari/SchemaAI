@@ -43,7 +43,7 @@ export const CanvasSpace = () => {
                 Start Designing Your Schema
               </h3>
               <p className="text-gray-700 mb-8 font-mono text-sm leading-relaxed max-w-lg mx-auto">
-                Use the AI assistant on the left to generate a schema by describing your database needs, or click <span className="font-bold text-black">"Add Table"</span> above to create tables manually.
+                Use the AI assistant on the left to generate a schema by describing your database needs, or click <span className="font-bold text-black">&quot;Add Table&quot;</span> above to create tables manually.
               </p>
               <div className="grid grid-cols-2 gap-4">
                 <div className="nb-card p-5 bg-cyan-100 text-left">
@@ -51,7 +51,7 @@ export const CanvasSpace = () => {
                     🤖 AI Generation
                   </div>
                   <div className="text-xs font-mono text-gray-800 leading-relaxed">
-                    "Create a blog schema with users and posts"
+                    &quot;Create a blog schema with users and posts&quot;
                   </div>
                 </div>
                 <div className="nb-card p-5 bg-lime-100 text-left">
@@ -59,7 +59,7 @@ export const CanvasSpace = () => {
                     ✏️ Manual Design
                   </div>
                   <div className="text-xs font-mono text-gray-800 leading-relaxed">
-                    Click "Add Table" and customize columns
+                    Click &quot;Add Table&quot; and customize columns
                   </div>
                 </div>
               </div>
