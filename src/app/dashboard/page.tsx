@@ -32,14 +32,18 @@ export default function DashboardPage() {
 
     void (async () => {
       setValidatingToken(true);
-      const validation = await validateSupabaseAccessToken(token);
-      if (cancelled) return;
+      try {
+        const validation = await validateSupabaseAccessToken(token);
+        if (cancelled) return;
 
-      if (!validation.ok) {
-        clearSupabaseMcpToken(user.id);
-        return;
+        if (!validation.ok) {
+          clearSupabaseMcpToken(user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setValidatingToken(false);
+        }
       }
-      setValidatingToken(false);
     })();
 
     return () => {

@@ -13,13 +13,14 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!loading && user) {
+    if (!loading && user && !submitted) {
       router.replace("/dashboard");
     }
-  }, [loading, router, user]);
+  }, [loading, router, submitted, user]);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,11 +29,13 @@ export default function LoginPage() {
     if (!normalizedEmail || !password) return;
 
     setSubmitting(true);
+    setSubmitted(true);
     setError(null);
 
     try {
       if (mode === "sign-in") {
         await signIn(normalizedEmail, password);
+        router.replace("/dashboard");
         return;
       }
 
@@ -41,6 +44,7 @@ export default function LoginPage() {
       // If email confirmations are enabled on the Supabase project, this may fail.
       try {
         await signIn(normalizedEmail, password);
+        router.replace("/dashboard");
       } catch {
         setError(
           "Sign-up successful. Check your email to confirm your account, then sign in.",
