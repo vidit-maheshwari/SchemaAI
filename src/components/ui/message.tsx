@@ -14,7 +14,7 @@ import ReactMarkdown from "react-markdown";
  * @property {VariantProps<typeof messageVariants>["variant"]} variant - Optional variant for custom styling
  */
 
-const messageVariants = cva("flex", {
+const messageVariants = cva("flex w-full", {
   variants: {
     variant: {
       default: "",
