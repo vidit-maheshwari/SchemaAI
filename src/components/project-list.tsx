@@ -17,9 +17,9 @@ interface ProjectListProps {
 export const ProjectList: React.FC<ProjectListProps> = ({ projects = [] }) => {
   return (
     <div className="grid gap-4 w-full max-w-xl">
-      {projects.map((project) => (
+      {projects.map((project, index) => (
         <div
-          key={project.id}
+          key={project.id || `project-${index}`}
           className="bg-white rounded-lg shadow-md p-6 border border-gray-200"
         >
           <div className="flex justify-between items-start mb-4">

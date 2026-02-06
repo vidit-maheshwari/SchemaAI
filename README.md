@@ -1,120 +1,253 @@
-# Supabase MCP Client React App
+# Supabase Schema Visualizer 🗄️
 
-Conversationally use Supabase!
+> A powerful AI-powered database schema visualization and management tool that lets you interact with your Supabase databases conversationally.
 
-A NextJS app showing how Supabase MCP tools and UI tools can be added to a React app using [Tambo](https://tambo.co).
+[![Watch Demo](https://img.shields.io/badge/Watch-Demo%20Video-red?logo=youtube&style=for-the-badge)](YOUR_YOUTUBE_LINK_HERE)
 
 ![Demo GIF](assets/supabase-mcp-client-short.gif)
 
-[Tambo](https://tambo.co) is a tool that lets you define and register your React components as UI tools that an LLM can use.
+## 🎯 Overview
 
-[Supabase MCP](https://github.com/supabase-community/supabase-mcp) is an MCP server that provides tool definitions for interacting with Supabase that an LLM can use.
+Supabase Schema Visualizer is a Next.js application that combines the power of **Supabase MCP** (Model Context Protocol) with **Tambo's AI-powered UI generation** to provide an intuitive, conversational interface for managing and visualizing database schemas.
 
-## How it works
+### Key Features
 
-- On startup a local Supabase MCP server is started.
-- The app fetches its tool definitions and registers the tools with Tambo.
-- The app registers components as "UI tools" with Tambo (see `src/lib/tambo.ts`).
-- When a message is submitted in the chat, it, along with the combined list of tools and components, is sent to Tambo to decide which tools to call and what text or UI to display.
+- 🤖 **Conversational Database Management** - Interact with your Supabase databases using natural language
+- 📊 **Visual Schema Designer** - Interactive canvas for designing and visualizing database schemas with drag-and-drop functionality
+- 🔗 **Relationship Mapping** - Automatically visualize foreign key relationships between tables
+- 🎨 **AI-Powered UI Components** - Dynamic component rendering based on your queries using Tambo
+- 🔐 **Secure Authentication** - Built-in Supabase authentication with token-based MCP server access
+- 📈 **Real-time Data Visualization** - View table data, statistics, and metadata in beautiful UI components
+- 💾 **SQL Export** - Generate SQL scripts from your visual schema designs
+- 🚀 **Live MCP Integration** - Connect directly to Supabase MCP tools for real-time database operations
 
-To tell Tambo where to find the MCP server, we simply list the URL in [src/app/layout.tsx](src/app/layout.tsx):
+## 🏗️ Architecture
 
-```tsx title="src/app/layout.tsx"
-  <TamboMcpProvider
-    mcpServers={[
-      `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse`,
-    ]}
-  >
-```
+### How It Works
 
-## Run locally and connect to your Supabase
+1. **MCP Server Integration**
+   - On startup, a local Supabase MCP server is launched via `src/server.ts`
+   - The app fetches tool definitions from the MCP server and registers them with Tambo
+   - All database operations are proxied through a secure Express server
 
-1. `npm install`
+2. **AI-Powered Components**
+   - React components are registered as "UI tools" with Tambo (see `src/lib/tambo.ts`)
+   - When you submit a message, it's sent to Tambo along with available tools and components
+   - Tambo's AI decides which tools to call and what UI to render
 
-2. Rename `example.env.local` to `.env.local` and add your keys:
+3. **Schema Visualization**
+   - Uses **ReactFlow** to render an interactive node-based canvas
+   - Tables are represented as nodes with columns and types
+   - Relationships are visualized as edges connecting related tables
+   - Full CRUD operations on tables and columns through the visual interface
 
-- `SUPABASE_ACCESS_TOKEN`: Your Supabase personal access token. You can generate one for your Supabase account here: [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
+### Tech Stack
 
-- `NEXT_PUBLIC_TAMBO_API_KEY`: Your Tambo API key. You can get a tambo API key for free [here](https://tambo.co/dashboard), or by running `npx tambo init`
+- **Frontend:** Next.js 15, React 19, TypeScript
+- **Database:** Supabase (PostgreSQL)
+- **AI Integration:** Tambo AI, MCP (Model Context Protocol)
+- **Visualization:** ReactFlow (XyFlow), Recharts
+- **Styling:** TailwindCSS
+- **State Management:** Zustand
+- **Backend:** Express.js proxy server
 
-Your `.env.local` file should look like this:
+## 🚀 Getting Started
 
-```
-NEXT_PUBLIC_TAMBO_API_KEY=<your tambo api key>
-SUPABASE_ACCESS_TOKEN=<your Supabase personal access token>
-NEXT_PUBLIC_SERVER_PORT=<your port>
-```
+### Prerequisites
 
-3. Run `npm run dev` and go to `localhost:3000` to use the app!
+- Node.js 20+
+- npm or yarn
+- A Supabase account and project ([Sign up here](https://supabase.com))
+- A Tambo API key ([Get one free here](https://tambo.co/dashboard))
 
-## Customizing
+### Installation
 
-### Add MCP servers
+1. **Clone the repository**
+   ```bash
+   git clone <your-repo-url>
+   cd supabase-mcp-client
+   ```
 
-To add MCP servers, you can add more URLs to the `mcpServers` array in [src/app/layout.tsx](src/app/layout.tsx). Tambo will automatically fetch and use the tool definitions from the MCP servers.
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
 
-```tsx title="src/app/layout.tsx"
+3. **Set up environment variables**
+
+   Create a `.env.local` file in the root directory:
+   ```env
+   NEXT_PUBLIC_TAMBO_API_KEY=your_tambo_api_key
+   NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
+   NEXT_PUBLIC_SUPABASE_ACCESS_TOKEN=your_supabase_personal_access_token
+   NEXT_PUBLIC_SERVER_PORT=3003
+   ```
+
+   **Where to find your keys:**
+   - **Tambo API Key:** Get from [Tambo Dashboard](https://tambo.co/dashboard) or run `npx tambo init`
+   - **Supabase URL & Anon Key:** Found in your Supabase project settings under "API"
+   - **Supabase Access Token:** Generate at [Supabase Account Tokens](https://supabase.com/dashboard/account/tokens)
+
+4. **Run the development server**
+   ```bash
+   npm run dev
+   ```
+
+5. **Open your browser**
+
+   Navigate to [http://localhost:3000](http://localhost:3000)
+
+### First-Time Setup
+
+1. On first launch, you'll be prompted to authenticate with Supabase
+2. The app will request your Supabase personal access token (stored securely in localStorage)
+3. Once authenticated, you can start interacting with your databases!
+
+## 💡 Usage
+
+### Conversational Commands
+
+Ask questions naturally in the chat interface:
+
+- "Show me all my tables"
+- "What's the structure of the users table?"
+- "Create a new table called products with id, name, and price columns"
+- "Visualize the schema for my database"
+- "Show me all projects in my Supabase account"
+- "Execute SELECT * FROM users LIMIT 10"
+
+### Visual Schema Designer
+
+1. Navigate to the Schema Canvas
+2. Drag and drop to position tables
+3. Click tables to edit columns and properties
+4. Connections automatically show foreign key relationships
+5. Export your schema as SQL when ready
+
+### Available Components
+
+The following UI components can be rendered by the AI:
+
+- **ProjectList** - Display all your Supabase projects
+- **TableList** - Show database tables with metadata
+- **Table** - Render query results in a data table
+- **Graph** - Visualize data with charts
+- **SchemaCanvas** - Interactive visual schema designer
+
+## 🔧 Customization
+
+### Adding MCP Servers
+
+To add additional MCP servers, update the `mcpServers` array in `src/app/layout.tsx`:
+
+```tsx
 <TamboMcpProvider
   mcpServers={[
     `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse`,
-    "another-mcp-server-url",
+    "https://another-mcp-server-url",
   ]}
 >
 ```
 
-### Change what components Tambo can use
+### Registering Custom Components
 
-The components or "UI tools" that Tambo can use are registered in `src/lib/tambo.ts`.
+Add new components to Tambo in `src/lib/tambo.ts`:
 
-For example, see how the `supabaseProjectList` component is registered with tambo:
-
-```tsx title="src/lib/tambo.ts"
+```tsx
 const components: TamboComponent[] = [
   {
-    name: "supabaseProjectList",
-    description:
-      "A component that displays a list of Supabase projects with their details. Use this when displaying a list of projects.",
-    component: ProjectList,
+    name: "myCustomComponent",
+    description: "A component that does something awesome",
+    component: MyCustomComponent,
     propsSchema: z.object({
-      projects: z
-        .array(
-          z.object({
-            name: z.string().describe("The name of the project"),
-            id: z.string().describe("The project ID"),
-            region: z
-              .string()
-              .describe("The region where the project is hosted"),
-            status: z.string().describe("The current status of the project"),
-            databaseHost: z.string().describe("The database host URL"),
-            createdAt: z.string().describe("The creation date of the project"),
-          })
-        )
-        .describe("Array of projects to display"),
+      data: z.string().describe("The data to display"),
     }),
   },
-  //...
+  // ... other components
 ];
 ```
 
-Note that the `component` field in the definition is a reference to the actual React component.
+### Limiting Query Results
 
-This list is passed to the `TamboProvider` component in `src/app/layout.tsx`:
+To optimize performance, limit the number of rows returned by queries:
 
-```tsx title="src/app/layout.tsx"
-<TamboProvider
-  apiKey={process.env.NEXT_PUBLIC_TAMBO_API_KEY!}
-  components={components}
->
-  {children}
-</TamboProvider>
+1. Go to your Supabase Dashboard
+2. Navigate to **Project Settings** → **Data API**
+3. Adjust the **Max rows** setting (default: 1000)
+
+## 📁 Project Structure
+
+```
+supabase-mcp-client/
+├── src/
+│   ├── app/                    # Next.js app router pages
+│   │   ├── page.tsx           # Landing page
+│   │   ├── login/             # Authentication pages
+│   │   └── dashboard/         # Main dashboard
+│   ├── components/            # React components
+│   │   ├── schema-canvas.tsx  # Visual schema designer
+│   │   ├── table-node.tsx     # Table visualization node
+│   │   ├── project-list.tsx   # Supabase projects list
+│   │   └── ui/                # Reusable UI components
+│   ├── lib/
+│   │   ├── tambo.ts           # Tambo component registration
+│   │   ├── supabase/          # Supabase client & auth
+│   │   ├── store/             # Zustand state management
+│   │   └── sql-generator.ts   # SQL export utilities
+│   ├── types/                 # TypeScript type definitions
+│   ├── server.ts              # Express MCP proxy server
+│   └── schema-mcp-server.ts   # Schema MCP server
+├── .env.local                 # Environment variables
+└── package.json
 ```
 
-Update the `components` array with any component(s) you want Tambo to be able to use in a response.
+## 🔐 Security Notes
 
-You can find more information about the component registration options [here.](https://tambo.co/docs/concepts/registering-components)
+- **Never commit real access tokens** to version control
+- The service role key should **never** be exposed client-side
+- Access tokens are currently stored in localStorage (temporary solution)
+- Always use the anon key for client-side operations
+- Enable Row Level Security (RLS) on your Supabase tables
 
-### Limit the number of rows returned by `execute_sql`
+## 🎓 Learn More
 
-The number of rows returned by a query affects how long the table component takes to generate. The default row limit returned by a query in a Supabase project is 1000, but you can change the `Max rows` setting in your Supabase dashboard under `Project Settings` under `Data API`.
+- [Tambo Documentation](https://tambo.co/docs) - Learn about AI-powered UI components
+- [Supabase MCP GitHub](https://github.com/supabase-community/supabase-mcp) - Official MCP server for Supabase
+- [Model Context Protocol](https://modelcontextprotocol.io/) - Understanding MCP
+- [Supabase Docs](https://supabase.com/docs) - Complete Supabase documentation
+- [ReactFlow Docs](https://reactflow.dev/) - Building node-based UIs
 
-#
+## 🎥 Demo Video
+
+Watch the full demo and walkthrough on YouTube:
+
+[![YouTube Demo](https://img.shields.io/badge/YouTube-Watch%20Demo-red?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
+
+**👆 Click above to see the Schema Visualizer in action!**
+
+## 🤝 Contributing
+
+Contributions are welcome! Feel free to:
+
+- Report bugs
+- Suggest new features
+- Submit pull requests
+- Improve documentation
+
+## 📄 License
+
+This project is open source and available under the [MIT License](LICENSE).
+
+## 🙏 Acknowledgments
+
+- Built with [Tambo](https://tambo.co) - AI-powered UI framework
+- Powered by [Supabase](https://supabase.com) - Open source Firebase alternative
+- Schema visualization by [ReactFlow](https://reactflow.dev)
+- Icons by [Lucide](https://lucide.dev)
+
+---
+
+**Built with ❤️ for the Hackathon**
+
+Need help? Found a bug? [Open an issue](https://github.com/yourusername/yourrepo/issues)
