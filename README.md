@@ -2,9 +2,13 @@
 
 > A powerful AI-powered database schema visualization and management tool that lets you interact with your Supabase databases conversationally.
 
-[![Watch Demo](https://img.shields.io/badge/Watch-Demo%20Video-red?logo=youtube&style=for-the-badge)](YOUR_YOUTUBE_LINK_HERE)
+## 🎥 Demo Video
 
-![Demo GIF](assets/supabase-mcp-client-short.gif)
+[![Watch the Demo](https://img.youtube.com/vi/DoGv47j3qEo/maxresdefault.jpg)](https://youtu.be/DoGv47j3qEo)
+
+**👆 Click above to watch the full demo and walkthrough!**
+
+
 
 ## 🎯 Overview
 
@@ -217,14 +221,6 @@ supabase-mcp-client/
 - [Model Context Protocol](https://modelcontextprotocol.io/) - Understanding MCP
 - [Supabase Docs](https://supabase.com/docs) - Complete Supabase documentation
 - [ReactFlow Docs](https://reactflow.dev/) - Building node-based UIs
-
-## 🎥 Demo Video
-
-Watch the full demo and walkthrough on YouTube:
-
-[![YouTube Demo](https://img.shields.io/badge/YouTube-Watch%20Demo-red?style=for-the-badge&logo=youtube)](YOUR_YOUTUBE_LINK_HERE)
-
-**👆 Click above to see the Schema Visualizer in action!**
 
 ## 🤝 Contributing
 
