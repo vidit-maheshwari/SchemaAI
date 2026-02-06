@@ -22,10 +22,14 @@ To tell Tambo where to find the MCP server, we simply list the URL in [src/app/l
 ```tsx title="src/app/layout.tsx"
   <TamboMcpProvider
     mcpServers={[
-      `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse`,
+      // The access token is provided by the user in the UI and appended as a query param.
+      // (Temporary approach; will be replaced by a more secure flow later.)
+      `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=<token-from-ui>`,
     ]}
   >
 ```
+
+Do not hardcode real access tokens in source code.
 
 ## Run locally and connect to your Supabase
 
@@ -33,19 +37,23 @@ To tell Tambo where to find the MCP server, we simply list the URL in [src/app/l
 
 2. Rename `example.env.local` to `.env.local` and add your keys:
 
-- `SUPABASE_ACCESS_TOKEN`: Your Supabase personal access token. You can generate one for your Supabase account here: [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens)
-
 - `NEXT_PUBLIC_TAMBO_API_KEY`: Your Tambo API key. You can get a tambo API key for free [here](https://tambo.co/dashboard), or by running `npx tambo init`
+
+- `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Your Supabase project URL and anon key (used for Supabase Auth).
 
 Your `.env.local` file should look like this:
 
 ```
 NEXT_PUBLIC_TAMBO_API_KEY=<your tambo api key>
-SUPABASE_ACCESS_TOKEN=<your Supabase personal access token>
+NEXT_PUBLIC_SUPABASE_URL=<your Supabase URL>
+NEXT_PUBLIC_SUPABASE_ANON_KEY=<your Supabase anon key>
 NEXT_PUBLIC_SERVER_PORT=<your port>
 ```
 
-3. Run `npm run dev` and go to `localhost:3000` to use the app!
+3. Run `npm run dev` and go to `localhost:3000`.
+
+On first login, the app will prompt you to paste your Supabase personal access token (stored in localStorage as a temporary solution). You can generate one at [https://supabase.com/dashboard/account/tokens](https://supabase.com/dashboard/account/tokens).
+
 
 ## Customizing
 
@@ -56,7 +64,7 @@ To add MCP servers, you can add more URLs to the `mcpServers` array in [src/app/
 ```tsx title="src/app/layout.tsx"
 <TamboMcpProvider
   mcpServers={[
-    `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse`,
+    `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=<token-from-ui>`,
     "another-mcp-server-url",
   ]}
 >

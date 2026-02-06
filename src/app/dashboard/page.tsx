@@ -1,14 +1,90 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { MessageThreadFull } from "@/components/ui/message-thread-full";
 import { CanvasSpace } from "@/components/ui/canvas-space";
 import { Toolbar } from "@/components/toolbar";
 import { TableEditor } from "@/components/table-editor";
 import { SQLExportPanel } from "@/components/sql-export-panel";
-import { Database } from "lucide-react";
+import { SupabaseMcpConnectModal } from "@/components/supabase-mcp-connect-modal";
+import { clearSupabaseMcpToken } from "@/lib/supabase/mcp-token";
+import { useAuth } from "@/lib/supabase/auth-provider";
+import { useSupabaseMcpConnection } from "@/lib/supabase/use-mcp-token";
+import { validateSupabaseAccessToken } from "@/lib/supabase/validate-access-token";
 
 export default function DashboardPage() {
+  const router = useRouter();
+  const { loading, user, signOut } = useAuth();
+  const { token } = useSupabaseMcpConnection(user?.id);
   const [showSQL, setShowSQL] = useState(false);
+  const [validatingToken, setValidatingToken] = useState(false);
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.replace("/login");
+    }
+  }, [loading, router, user]);
+
+  useEffect(() => {
+    if (!user?.id || !token) return;
+
+    let cancelled = false;
+
+    void (async () => {
+      setValidatingToken(true);
+      try {
+        const validation = await validateSupabaseAccessToken(token);
+        if (cancelled) return;
+
+        if (!validation.ok && validation.isAuthError) {
+          clearSupabaseMcpToken(user.id);
+        }
+      } finally {
+        if (!cancelled) {
+          setValidatingToken(false);
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token, user?.id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="font-mono text-sm text-gray-800">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  if (!token) {
+    return (
+      <SupabaseMcpConnectModal
+        userId={user.id}
+        onLogout={() => {
+          void signOut().finally(() => {
+            router.replace("/login");
+          });
+        }}
+      />
+    );
+  }
+
+  if (validatingToken) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="font-mono text-sm text-gray-800">
+          Validating Supabase token...
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-screen bg-white">

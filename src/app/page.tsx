@@ -6,7 +6,7 @@ export default function Home() {
   const router = useRouter();
 
   const handleGetStarted = () => {
-    router.push("/dashboard");
+    router.push("/login");
   };
 
   return <LandingPage onGetStarted={handleGetStarted} />;
