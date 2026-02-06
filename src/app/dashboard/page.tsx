@@ -37,6 +37,7 @@ export default function DashboardPage() {
 
       if (!validation.ok) {
         clearSupabaseMcpToken(user.id);
+        return;
       }
       setValidatingToken(false);
     })();

@@ -17,6 +17,7 @@ export function Toolbar({ onShowSQL }: ToolbarProps) {
   const { signOut } = useAuth();
   const { addTable, resetSchema, schema } = useSchemaStore();
   const [copied, setCopied] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const handleAddTable = () => {
     const tableNumber = schema.tables.length + 1;
@@ -61,7 +62,10 @@ export function Toolbar({ onShowSQL }: ToolbarProps) {
   };
 
   const handleLogout = () => {
+    if (loggingOut) return;
+    setLoggingOut(true);
     void signOut().finally(() => {
+      setLoggingOut(false);
       router.replace("/login");
     });
   };
@@ -126,9 +130,10 @@ export function Toolbar({ onShowSQL }: ToolbarProps) {
         onClick={handleLogout}
         className="nb-btn bg-orange-200 hover:bg-orange-300 gap-2"
         title="Log out"
+        disabled={loggingOut}
       >
         <LogOut size={18} />
-        <span>Log out</span>
+        <span>{loggingOut ? "Logging out..." : "Log out"}</span>
       </button>
 
       {/* Divider */}

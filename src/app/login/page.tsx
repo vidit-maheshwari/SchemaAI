@@ -33,7 +33,6 @@ export default function LoginPage() {
     try {
       if (mode === "sign-in") {
         await signIn(normalizedEmail, password);
-        router.replace("/dashboard");
         return;
       }
 
@@ -42,7 +41,6 @@ export default function LoginPage() {
       // If email confirmations are enabled on the Supabase project, this may fail.
       try {
         await signIn(normalizedEmail, password);
-        router.replace("/dashboard");
       } catch {
         setError(
           "Sign-up successful. Check your email to confirm your account, then sign in.",

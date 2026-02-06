@@ -4,7 +4,7 @@ export async function validateSupabaseAccessToken(
   accessToken: string,
 ): Promise<{ ok: true } | { ok: false; error: string }> {
   const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), 10_000);
+  const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
   try {
     const res = await fetch("https://api.supabase.com/v1/projects", {
@@ -31,6 +31,6 @@ export async function validateSupabaseAccessToken(
     }
     return { ok: false, error: err instanceof Error ? err.message : String(err) };
   } finally {
-    window.clearTimeout(timeoutId);
+    clearTimeout(timeoutId);
   }
 }

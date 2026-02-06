@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  clearSupabaseMcpToken,
   setSupabaseMcpProjectUrl,
   setSupabaseMcpToken,
 } from "@/lib/supabase/mcp-token";
@@ -38,9 +39,16 @@ export function SupabaseMcpConnectModal(props: {
       }
 
       setSupabaseMcpToken(props.userId, normalizedToken);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
     } finally {
       setConnecting(false);
     }
+  };
+
+  const onLogout = () => {
+    clearSupabaseMcpToken(props.userId);
+    props.onLogout();
   };
 
   return (
@@ -97,7 +105,7 @@ export function SupabaseMcpConnectModal(props: {
 
         <div className="mt-6 flex items-center justify-end gap-3">
           <button
-            onClick={props.onLogout}
+            onClick={onLogout}
             className="nb-btn bg-gray-200 hover:bg-gray-300"
             type="button"
             disabled={connecting}

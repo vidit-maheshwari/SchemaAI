@@ -44,11 +44,14 @@ const { close } = await startSSEServer({
 
     const mcpClient = new Client({ name: "schema-generator", version: "1.0.0" });
 
+    const baseEnv = getProcessEnv();
+    delete baseEnv.SUPABASE_ACCESS_TOKEN;
+
     const stdioTransport = new StdioClientTransport({
       command: "npx",
       args: ["tsx", mcpServerPath],
       env: {
-        ...getProcessEnv(),
+        ...baseEnv,
         SUPABASE_ACCESS_TOKEN: accessToken,
       },
     });

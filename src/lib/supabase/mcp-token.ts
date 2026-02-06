@@ -43,11 +43,22 @@ export function subscribeToSupabaseMcpTokenChanges(
 ): () => void {
   if (typeof window === "undefined") return () => {};
 
+  const onStorage = (event: StorageEvent) => {
+    if (!event.key) return;
+    if (
+      !event.key.startsWith(TOKEN_STORAGE_PREFIX) &&
+      !event.key.startsWith(PROJECT_URL_STORAGE_PREFIX)
+    ) {
+      return;
+    }
+    callback();
+  };
+
   window.addEventListener(TOKEN_CHANGE_EVENT, callback);
-  window.addEventListener("storage", callback);
+  window.addEventListener("storage", onStorage);
 
   return () => {
     window.removeEventListener(TOKEN_CHANGE_EVENT, callback);
-    window.removeEventListener("storage", callback);
+    window.removeEventListener("storage", onStorage);
   };
 }

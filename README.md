@@ -24,10 +24,12 @@ To tell Tambo where to find the MCP server, we simply list the URL in [src/app/l
     mcpServers={[
       // The access token is provided by the user in the UI and appended as a query param.
       // (Temporary approach; will be replaced by a more secure flow later.)
-      `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=...`,
+      `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=<token-from-ui>`,
     ]}
   >
 ```
+
+Do not hardcode real access tokens in source code.
 
 ## Run locally and connect to your Supabase
 
@@ -62,7 +64,7 @@ To add MCP servers, you can add more URLs to the `mcpServers` array in [src/app/
 ```tsx title="src/app/layout.tsx"
 <TamboMcpProvider
   mcpServers={[
-    `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=...`,
+    `http://localhost:${process.env.NEXT_PUBLIC_SERVER_PORT}/sse?supabase_access_token=<token-from-ui>`,
     "another-mcp-server-url",
   ]}
 >
