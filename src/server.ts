@@ -28,6 +28,59 @@ function getProcessEnv(): Record<string, string> {
 const { close } = await startSSEServer({
   port: parseInt(process.env.NEXT_PUBLIC_SERVER_PORT!),
   endpoint: "/sse",
+  onUnhandledRequest: async (req, res) => {
+    const url = new URL(req.url || "/", "http://localhost");
+
+    if (req.method === "GET" && url.pathname === "/validate") {
+      const accessToken =
+        url.searchParams.get("supabase_access_token") ||
+        url.searchParams.get("supabaseAccessToken") ||
+        "";
+
+      if (!accessToken) {
+        res.writeHead(400).end("Missing Supabase access token");
+        return;
+      }
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10_000);
+      try {
+        const validationRes = await fetch("https://api.supabase.com/v1/projects", {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${accessToken}`,
+          },
+          signal: controller.signal,
+        });
+
+        if (validationRes.ok) {
+          res
+            .writeHead(200, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ ok: true }));
+          return;
+        }
+
+        if (validationRes.status === 401 || validationRes.status === 403) {
+          res.writeHead(401).end("Unauthorized");
+          return;
+        }
+
+        res.writeHead(502).end("Supabase validation failed");
+        return;
+      } catch (err) {
+        if (err instanceof Error && err.name === "AbortError") {
+          res.writeHead(504).end("Supabase validation timed out");
+          return;
+        }
+        res.writeHead(502).end("Supabase validation failed");
+        return;
+      } finally {
+        clearTimeout(timeoutId);
+      }
+    }
+
+    res.writeHead(404).end();
+  },
   createServer: async (req) => {
     const url = new URL(req.url || "/", "http://localhost");
     const accessToken =
@@ -56,7 +109,15 @@ const { close } = await startSSEServer({
       },
     });
 
-    await mcpClient.connect(stdioTransport);
+    try {
+      await mcpClient.connect(stdioTransport);
+    } catch {
+      await Promise.allSettled([mcpClient.close(), stdioTransport.close()]);
+      throw new Response("Failed to start MCP server", {
+        status: 500,
+        statusText: "Internal Server Error",
+      });
+    }
 
     const server = new Server(
       {

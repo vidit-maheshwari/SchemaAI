@@ -36,7 +36,7 @@ export default function DashboardPage() {
         const validation = await validateSupabaseAccessToken(token);
         if (cancelled) return;
 
-        if (!validation.ok) {
+        if (!validation.ok && validation.isAuthError) {
           clearSupabaseMcpToken(user.id);
         }
       } finally {

@@ -2,34 +2,54 @@
 
 export async function validateSupabaseAccessToken(
   accessToken: string,
-): Promise<{ ok: true } | { ok: false; error: string }> {
+): Promise<
+  | { ok: true }
+  | { ok: false; error: string; isAuthError: boolean }
+> {
+  const serverPort = process.env.NEXT_PUBLIC_SERVER_PORT;
+  if (!serverPort) {
+    return {
+      ok: false,
+      error: "Missing NEXT_PUBLIC_SERVER_PORT",
+      isAuthError: false,
+    };
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 10_000);
 
   try {
-    const res = await fetch("https://api.supabase.com/v1/projects", {
+    const validateUrl = `http://localhost:${serverPort}/validate?supabase_access_token=${encodeURIComponent(accessToken)}`;
+    const res = await fetch(validateUrl, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
       signal: controller.signal,
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
+      const isAuthError = res.status === 401 || res.status === 403;
       return {
         ok: false,
-        error:
-          text || `Supabase API request failed (${res.status} ${res.statusText})`,
+        isAuthError,
+        error: isAuthError
+          ? "Supabase rejected this token. Please double-check it."
+          : `Token validation failed (${res.status} ${res.statusText}). Please try again.`,
       };
     }
 
     return { ok: true };
   } catch (err) {
     if (err instanceof Error && err.name === "AbortError") {
-      return { ok: false, error: "Supabase request timed out" };
+      return {
+        ok: false,
+        error: "Token validation timed out. Please try again.",
+        isAuthError: false,
+      };
     }
-    return { ok: false, error: err instanceof Error ? err.message : String(err) };
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : String(err),
+      isAuthError: false,
+    };
   } finally {
     clearTimeout(timeoutId);
   }

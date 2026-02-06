@@ -17,7 +17,7 @@ export function SupabaseMcpConnectModal(props: {
   const [error, setError] = useState<string | null>(null);
   const [connecting, setConnecting] = useState(false);
 
-  const tokenLooksValid = useMemo(() => token.trim().length >= 20, [token]);
+  const tokenLooksValid = useMemo(() => token.trim().length > 0, [token]);
 
   const onConnect = async () => {
     const normalizedToken = token.trim();
@@ -121,7 +121,7 @@ export function SupabaseMcpConnectModal(props: {
             title={
               tokenLooksValid
                 ? "Validate and connect"
-                : "Token must be at least 20 characters"
+                : "Token is required"
             }
           >
             {connecting ? "Connecting..." : "Connect"}
