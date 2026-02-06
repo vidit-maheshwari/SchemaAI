@@ -1,5 +1,8 @@
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import {
+  getDefaultEnvironment,
+  StdioClientTransport,
+} from "@modelcontextprotocol/sdk/client/stdio.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import * as dotenv from "dotenv";
 import { proxyServer, startSSEServer } from "mcp-proxy";
@@ -15,16 +18,6 @@ const __dirname = dirname(__filename);
 const mcpServerPath = join(__dirname, "schema-mcp-server.ts");
 console.log("Starting Schema Generator MCP Server:", mcpServerPath);
 
-function getProcessEnv(): Record<string, string> {
-  const env: Record<string, string> = {};
-  for (const [key, value] of Object.entries(process.env)) {
-    if (typeof value === "string") {
-      env[key] = value;
-    }
-  }
-  return env;
-}
-
 const { close } = await startSSEServer({
   port: parseInt(process.env.NEXT_PUBLIC_SERVER_PORT!),
   endpoint: "/sse",
@@ -38,7 +31,9 @@ const { close } = await startSSEServer({
         "";
 
       if (!accessToken) {
-        res.writeHead(400).end("Missing Supabase access token");
+        res
+          .writeHead(400, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ ok: false, reason: "missing_token" }));
         return;
       }
 
@@ -61,18 +56,26 @@ const { close } = await startSSEServer({
         }
 
         if (validationRes.status === 401 || validationRes.status === 403) {
-          res.writeHead(401).end("Unauthorized");
+          res
+            .writeHead(401, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ ok: false, reason: "unauthorized" }));
           return;
         }
 
-        res.writeHead(502).end("Supabase validation failed");
+        res
+          .writeHead(502, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ ok: false, reason: "supabase_error" }));
         return;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") {
-          res.writeHead(504).end("Supabase validation timed out");
+          res
+            .writeHead(504, { "Content-Type": "application/json" })
+            .end(JSON.stringify({ ok: false, reason: "timeout" }));
           return;
         }
-        res.writeHead(502).end("Supabase validation failed");
+        res
+          .writeHead(502, { "Content-Type": "application/json" })
+          .end(JSON.stringify({ ok: false, reason: "supabase_error" }));
         return;
       } finally {
         clearTimeout(timeoutId);
@@ -97,8 +100,10 @@ const { close } = await startSSEServer({
 
     const mcpClient = new Client({ name: "schema-generator", version: "1.0.0" });
 
-    const baseEnv = getProcessEnv();
-    delete baseEnv.SUPABASE_ACCESS_TOKEN;
+    const baseEnv = {
+      ...getDefaultEnvironment(),
+      NODE_ENV: process.env.NODE_ENV ?? "development",
+    };
 
     const stdioTransport = new StdioClientTransport({
       command: "npx",
